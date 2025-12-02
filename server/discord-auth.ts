@@ -23,7 +23,7 @@ export function setupAuth(app: Express) {
   passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID || "",
     clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
-    callbackURL: process.env.DISCORD_REDIRECT_URI || "http://localhost:5000/api/auth/callback",
+    callbackURL: process.env.DISCORD_REDIRECT_URI || "https://portal-judicial-chrpcm.onrender.com/auth/discord/callback",
     scope: ['identify', 'email']
   }, async (
     accessToken: string, 
