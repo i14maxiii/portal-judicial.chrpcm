@@ -1,0 +1,56 @@
+Actúa como un Desarrollador Full Stack Senior. Necesito que construyas una aplicación web completa para un servidor de RolePlay (GTA V/FiveM) basada en el sistema judicial de Chile. El proyecto se llama "Portal Judicial - Fiscalía RP".
+
+**Stack Tecnológico Preferido:**
+- Backend: Node.js con Express.
+- Base de Datos: SQLite (para persistencia simple) o Replit Database.
+- Frontend: HTML5, CSS (TailwindCSS para diseño rápido y responsivo), EJS (motor de plantillas).
+- Autenticación: Passport.js con estrategia de Discord.
+
+**Estructura y Funcionalidades:**
+
+1.  **Landing Page (Página de Inicio):**
+    - Diseño institucional, serio y moderno (tonos azules oscuros, grises y blancos, estilo gobierno de Chile).
+    - Bienvenida clara: "Bienvenido al Portal del Poder Judicial y Ministerio Público".
+    - Sección informativa breve sobre qué trámites se pueden realizar.
+    - Botón prominente: "Iniciar Sesión con Discord".
+
+2.  **Sistema de Autenticación y Navegación:**
+    - Login exclusivo vía Discord.
+    - **Navbar:** Debe mostrar el avatar y nombre del usuario. Al hacer clic, desplegar un menú con:
+        - "Mi Perfil" (Datos básicos del usuario de Discord).
+        - "Hoja de Vida" (Resumen de antecedentes del personaje).
+        - "Certificado de Antecedentes" (Opción extra: Generar un visual simple de antecedentes penales).
+        - "Cerrar Sesión".
+
+3.  **Módulo de Funcionarios (Dashboard Principal):**
+    - Debe tener un diseño de grid o tarjetas para acceso rápido.
+    - **Categorías de Búsqueda:**
+        - Búsqueda de Vehículos (Por Patente).
+        - Búsqueda de Causas (Por RUC - Rol Único de Causa o RIT).
+        - Búsqueda de Personas (Por RUT o Nombre).
+    - **Acciones de Creación:**
+        - "Ingresar Nueva Causa".
+        - "Generar Incautación".
+        - "Emitir Citación Judicial".
+
+4.  **Módulo de Administración (Gestión de Causas):**
+    - **Permisos:** Por ahora, haz que este módulo sea accesible para *cualquier usuario logueado* para efectos de prueba, pero deja comentado claramente dónde debo poner el ID del ROL de Discord para restringirlo en el futuro.
+    - **CRUD de Causas:**
+        - Los administradores pueden ver todas las causas.
+        - **Borrado Lógico (Papelera):**
+            - Si un admin elimina una causa, NO debe borrarse de la base de datos inmediatamente. Debe cambiar un estado a `deleted: true` o moverse a una tabla de "Papelera".
+    - **Vista de Papelera:**
+        - Una sección separada donde se ven las causas eliminadas.
+        - Opciones en cada ítem: "Restaurar Causa" o "Eliminar Definitivamente" (esto sí borra el registro de la DB).
+
+**Requerimientos de Base de Datos (Esquema Sugerido):**
+- Users (discordId, username, role).
+- Citizens (rut, nombre, antecedentes).
+- Vehicles (patente, modelo, dueño_rut).
+- Causes (ruc, rit, descripcion, estado, imputado_rut, is_deleted).
+
+**Estética:**
+- Usa un diseño limpio, con tipografías sans-serif (como Inter o Roboto).
+- Asegúrate de que los formularios parezcan documentos oficiales (bordes sutiles, estructura ordenada).
+
+Por favor, genera la estructura de archivos, el servidor (index.js), los modelos de base de datos y las vistas EJS necesarias.
