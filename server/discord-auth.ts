@@ -1,108 +1,64 @@
+import passport from "passport";
+import { Strategy as DiscordStrategy } from "passport-discord";
+import { type Express } from "express";
 import { storage } from "./storage";
-import type { User } from "@shared/schema";
 
-let connectionSettings: any;
+export function setupAuth(app: Express) {
+  // 1. Serialización
+  passport.serializeUser((user: any, done) => {
+    done(null, user.id);
+  });
 
-async function getDiscordConnectionSettings() {
-  if (
-    connectionSettings &&
-    connectionSettings.settings.expires_at &&
-    new Date(connectionSettings.settings.expires_at).getTime() > Date.now()
-  ) {
-    return connectionSettings;
-  }
-
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? "repl " + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? "depl " + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!xReplitToken || !hostname) {
-    throw new Error("Replit environment not configured for Discord auth");
-  }
-
-  const response = await fetch(
-    `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=discord`,
-    {
-      headers: {
-        Accept: "application/json",
-        X_REPLIT_TOKEN: xReplitToken,
-      },
+  // 2. Deserialización
+  passport.deserializeUser(async (id: string, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (err) {
+      done(err, null);
     }
-  );
-
-  const data = await response.json();
-  connectionSettings = data.items?.[0];
-
-  if (!connectionSettings) {
-    throw new Error("Discord connection not configured");
-  }
-
-  return connectionSettings;
-}
-
-export async function getDiscordAccessToken(): Promise<string> {
-  const settings = await getDiscordConnectionSettings();
-  const accessToken =
-    settings?.settings?.access_token ||
-    settings?.settings?.oauth?.credentials?.access_token;
-
-  if (!accessToken) {
-    throw new Error("Discord access token not found");
-  }
-
-  return accessToken;
-}
-
-export async function getDiscordUser(): Promise<{
-  id: string;
-  username: string;
-  avatar: string | null;
-  email?: string;
-}> {
-  const accessToken = await getDiscordAccessToken();
-
-  const response = await fetch("https://discord.com/api/v10/users/@me", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Discord user: ${response.status}`);
-  }
+  // 3. Configuración de la estrategia
+  passport.use(new DiscordStrategy({
+    clientID: process.env.DISCORD_CLIENT_ID || "",
+    clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
+    callbackURL: process.env.DISCORD_REDIRECT_URI || "http://localhost:5000/api/auth/callback",
+    scope: ['identify', 'email']
+  }, async (
+    accessToken: string, 
+    refreshToken: string, 
+    profile: any, // <--- CAMBIO: Usamos 'any' para evitar conflictos de importación
+    done: (err: any, user?: any) => void
+  ) => {
+    try {
+      // Validar datos mínimos
+      if (!profile.id || !profile.username) {
+        return done(new Error("Datos de perfil de Discord incompletos"));
+      }
 
-  const discordUser = await response.json();
+      let user = await storage.getUserByDiscordId(profile.id);
+      
+      if (!user) {
+        user = await storage.createUser({
+          discordId: profile.id,
+          username: profile.username,
+          avatar: profile.avatar || undefined,
+          role: "user" 
+        });
+      } else {
+        user = await storage.updateUser(user.id, {
+            username: profile.username,
+            avatar: profile.avatar || undefined 
+        });
+      }
+      return done(null, user);
+    } catch (err) {
+      console.error("Discord Auth Error:", err);
+      return done(err, undefined);
+    }
+  }));
 
-  return {
-    id: discordUser.id,
-    username: discordUser.username || discordUser.global_name || "Unknown",
-    avatar: discordUser.avatar,
-    email: discordUser.email,
-  };
-}
-
-export async function authenticateWithDiscord(): Promise<User> {
-  const discordUser = await getDiscordUser();
-
-  let user = await storage.getUserByDiscordId(discordUser.id);
-
-  if (user) {
-    user = await storage.updateUser(user.id, {
-      username: discordUser.username,
-      avatar: discordUser.avatar || undefined,
-    });
-    return user!;
-  }
-
-  user = await storage.createUser({
-    discordId: discordUser.id,
-    username: discordUser.username,
-    avatar: discordUser.avatar || undefined,
-    role: "user",
-  });
-
-  return user;
+  app.use(passport.initialize());
+  app.use(passport.session());
 }

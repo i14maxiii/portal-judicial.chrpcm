@@ -1,19 +1,14 @@
-import {
-  type User,
-  type InsertUser,
-  type Citizen,
-  type InsertCitizen,
-  type Vehicle,
-  type InsertVehicle,
-  type Cause,
-  type InsertCause,
-  type Confiscation,
-  type InsertConfiscation,
-  type Citation,
-  type InsertCitation,
+import { 
+  UserModel, CitizenModel, VehicleModel, CauseModel, 
+  ConfiscationModel, CitationModel 
+} from "./models";
+import type { 
+  User, InsertUser, Citizen, InsertCitizen, 
+  Vehicle, InsertVehicle, Cause, InsertCause, 
+  Confiscation, InsertConfiscation, Citation, InsertCitation 
 } from "@shared/schema";
-import { randomUUID } from "crypto";
 
+// 1. DEFINICIÓN DE LA INTERFAZ (Esto faltaba y causaba el error)
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByDiscordId(discordId: string): Promise<User | undefined>;
@@ -49,352 +44,197 @@ export interface IStorage {
   getCitationsByCauseId(causeId: string): Promise<Citation[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private citizens: Map<string, Citizen>;
-  private vehicles: Map<string, Vehicle>;
-  private causes: Map<string, Cause>;
-  private confiscations: Map<string, Confiscation>;
-  private citations: Map<string, Citation>;
+// 2. HELPER PARA MAPEAR DOCUMENTOS DE MONGO A OBJETOS
+const mapDoc = <T>(doc: any): T => {
+  if (!doc) return doc;
+  const obj = doc.toObject();
+  obj.id = obj._id.toString();
+  delete obj._id;
+  delete obj.__v;
+  return obj as T;
+};
 
-  constructor() {
-    this.users = new Map();
-    this.citizens = new Map();
-    this.vehicles = new Map();
-    this.causes = new Map();
-    this.confiscations = new Map();
-    this.citations = new Map();
-
-    this.seedData();
-  }
-
-  private seedData() {
-    const citizen1: Citizen = {
-      id: randomUUID(),
-      rut: "12.345.678-9",
-      nombre: "Juan Carlos Pérez González",
-      antecedentes: "Sin antecedentes penales",
-    };
-    const citizen2: Citizen = {
-      id: randomUUID(),
-      rut: "11.222.333-4",
-      nombre: "María Fernanda López Soto",
-      antecedentes: null,
-    };
-    const citizen3: Citizen = {
-      id: randomUUID(),
-      rut: "9.876.543-2",
-      nombre: "Roberto Andrés Muñoz Vera",
-      antecedentes: "Falta menor - Conducción sin licencia (2023)",
-    };
-    this.citizens.set(citizen1.id, citizen1);
-    this.citizens.set(citizen2.id, citizen2);
-    this.citizens.set(citizen3.id, citizen3);
-
-    const vehicle1: Vehicle = {
-      id: randomUUID(),
-      patente: "ABCD12",
-      modelo: "Toyota Corolla 2022",
-      duenoRut: "12.345.678-9",
-    };
-    const vehicle2: Vehicle = {
-      id: randomUUID(),
-      patente: "WXYZ99",
-      modelo: "Chevrolet Spark 2021",
-      duenoRut: "11.222.333-4",
-    };
-    const vehicle3: Vehicle = {
-      id: randomUUID(),
-      patente: "QRST45",
-      modelo: "Ford Ranger 2023",
-      duenoRut: "9.876.543-2",
-    };
-    this.vehicles.set(vehicle1.id, vehicle1);
-    this.vehicles.set(vehicle2.id, vehicle2);
-    this.vehicles.set(vehicle3.id, vehicle3);
-
-    const cause1: Cause = {
-      id: randomUUID(),
-      ruc: "2300123456-7",
-      rit: "O-123-2024",
-      descripcion: "Robo con intimidación en local comercial ubicado en Av. Principal 1234. El imputado habría ingresado al establecimiento portando arma blanca.",
-      estado: "activa",
-      imputadoRut: "9.876.543-2",
-      fiscalId: null,
-      isDeleted: false,
-      createdAt: new Date().toISOString(),
-      deletedAt: null,
-    };
-    const cause2: Cause = {
-      id: randomUUID(),
-      ruc: "2300654321-0",
-      rit: "O-456-2024",
-      descripcion: "Lesiones leves en riña callejera ocurrida el día 15 de noviembre de 2024 en sector centro.",
-      estado: "pendiente",
-      imputadoRut: "12.345.678-9",
-      fiscalId: null,
-      isDeleted: false,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      deletedAt: null,
-    };
-    const cause3: Cause = {
-      id: randomUUID(),
-      ruc: "2300111222-3",
-      rit: null,
-      descripcion: "Hurto simple de especies desde vehículo estacionado.",
-      estado: "cerrada",
-      imputadoRut: "11.222.333-4",
-      fiscalId: null,
-      isDeleted: false,
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-      deletedAt: null,
-    };
-    this.causes.set(cause1.id, cause1);
-    this.causes.set(cause2.id, cause2);
-    this.causes.set(cause3.id, cause3);
-  }
-
+// 3. IMPLEMENTACIÓN DE MONGO STORAGE
+export class MongoStorage implements IStorage {
+  // --- USUARIOS ---
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    try {
+      const doc = await UserModel.findById(id);
+      return doc ? mapDoc<User>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async getUserByDiscordId(discordId: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.discordId === discordId
-    );
+    const doc = await UserModel.findOne({ discordId });
+    return doc ? mapDoc<User>(doc) : undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = {
-      id,
-      discordId: insertUser.discordId,
-      username: insertUser.username,
-      avatar: insertUser.avatar || null,
-      role: insertUser.role || "user",
-    };
-    this.users.set(id, user);
-    return user;
+  async createUser(user: InsertUser): Promise<User> {
+    const doc = await UserModel.create(user);
+    return mapDoc<User>(doc);
   }
 
-  async updateUser(id: string, userData: Partial<InsertUser>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updated: User = {
-      ...user,
-      ...userData,
-      avatar: userData.avatar !== undefined ? userData.avatar || null : user.avatar,
-    };
-    this.users.set(id, updated);
-    return updated;
+  async updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined> {
+    try {
+      const doc = await UserModel.findByIdAndUpdate(id, user, { new: true });
+      return doc ? mapDoc<User>(doc) : undefined;
+    } catch { return undefined; }
   }
 
+  // --- CIUDADANOS ---
   async getCitizen(id: string): Promise<Citizen | undefined> {
-    return this.citizens.get(id);
+    try {
+      const doc = await CitizenModel.findById(id);
+      return doc ? mapDoc<Citizen>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async getCitizenByRut(rut: string): Promise<Citizen | undefined> {
-    return Array.from(this.citizens.values()).find(
-      (citizen) => citizen.rut === rut
-    );
+    const doc = await CitizenModel.findOne({ rut });
+    return doc ? mapDoc<Citizen>(doc) : undefined;
   }
 
   async searchCitizens(query: string): Promise<Citizen[]> {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.citizens.values()).filter(
-      (citizen) =>
-        citizen.rut.toLowerCase().includes(lowerQuery) ||
-        citizen.nombre.toLowerCase().includes(lowerQuery)
-    );
+    const regex = new RegExp(query, 'i');
+    const docs = await CitizenModel.find({
+      $or: [{ rut: regex }, { nombre: regex }]
+    });
+    return docs.map(d => mapDoc<Citizen>(d));
   }
 
-  async createCitizen(insertCitizen: InsertCitizen): Promise<Citizen> {
-    const id = randomUUID();
-    const citizen: Citizen = {
-      id,
-      rut: insertCitizen.rut,
-      nombre: insertCitizen.nombre,
-      antecedentes: insertCitizen.antecedentes || null,
-    };
-    this.citizens.set(id, citizen);
-    return citizen;
+  async createCitizen(citizen: InsertCitizen): Promise<Citizen> {
+    const doc = await CitizenModel.create(citizen);
+    return mapDoc<Citizen>(doc);
   }
 
   async getAllCitizens(): Promise<Citizen[]> {
-    return Array.from(this.citizens.values());
+    const docs = await CitizenModel.find();
+    return docs.map(d => mapDoc<Citizen>(d));
   }
 
+  // --- VEHICULOS ---
   async getVehicle(id: string): Promise<Vehicle | undefined> {
-    return this.vehicles.get(id);
+    try {
+      const doc = await VehicleModel.findById(id);
+      return doc ? mapDoc<Vehicle>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async getVehicleByPatente(patente: string): Promise<Vehicle | undefined> {
-    return Array.from(this.vehicles.values()).find(
-      (vehicle) => vehicle.patente.toLowerCase() === patente.toLowerCase()
-    );
+    const doc = await VehicleModel.findOne({ patente });
+    return doc ? mapDoc<Vehicle>(doc) : undefined;
   }
 
   async searchVehicles(query: string): Promise<Vehicle[]> {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.vehicles.values()).filter(
-      (vehicle) =>
-        vehicle.patente.toLowerCase().includes(lowerQuery) ||
-        vehicle.modelo.toLowerCase().includes(lowerQuery) ||
-        vehicle.duenoRut.toLowerCase().includes(lowerQuery)
-    );
+    const regex = new RegExp(query, 'i');
+    const docs = await VehicleModel.find({
+      $or: [{ patente: regex }, { modelo: regex }, { duenoRut: regex }]
+    });
+    return docs.map(d => mapDoc<Vehicle>(d));
   }
 
-  async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
-    const id = randomUUID();
-    const vehicle: Vehicle = {
-      id,
-      patente: insertVehicle.patente,
-      modelo: insertVehicle.modelo,
-      duenoRut: insertVehicle.duenoRut,
-    };
-    this.vehicles.set(id, vehicle);
-    return vehicle;
+  async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
+    const doc = await VehicleModel.create(vehicle);
+    return mapDoc<Vehicle>(doc);
   }
 
   async getAllVehicles(): Promise<Vehicle[]> {
-    return Array.from(this.vehicles.values());
+    const docs = await VehicleModel.find();
+    return docs.map(d => mapDoc<Vehicle>(d));
   }
 
+  // --- CAUSAS ---
   async getCause(id: string): Promise<Cause | undefined> {
-    const cause = this.causes.get(id);
-    if (cause && !cause.isDeleted) return cause;
-    return undefined;
+    try {
+      const doc = await CauseModel.findOne({ _id: id, isDeleted: false });
+      return doc ? mapDoc<Cause>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async getAllCauses(): Promise<Cause[]> {
-    return Array.from(this.causes.values()).filter((cause) => !cause.isDeleted);
+    const docs = await CauseModel.find({ isDeleted: false }).sort({ createdAt: -1 });
+    return docs.map(d => mapDoc<Cause>(d));
   }
 
   async getDeletedCauses(): Promise<Cause[]> {
-    return Array.from(this.causes.values()).filter((cause) => cause.isDeleted);
+    const docs = await CauseModel.find({ isDeleted: true }).sort({ deletedAt: -1 });
+    return docs.map(d => mapDoc<Cause>(d));
   }
 
   async searchCauses(query: string): Promise<Cause[]> {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.causes.values()).filter(
-      (cause) =>
-        !cause.isDeleted &&
-        (cause.ruc.toLowerCase().includes(lowerQuery) ||
-          (cause.rit && cause.rit.toLowerCase().includes(lowerQuery)) ||
-          cause.descripcion.toLowerCase().includes(lowerQuery) ||
-          cause.imputadoRut.toLowerCase().includes(lowerQuery))
-    );
-  }
-
-  async createCause(insertCause: InsertCause): Promise<Cause> {
-    const id = randomUUID();
-    const cause: Cause = {
-      id,
-      ruc: insertCause.ruc,
-      rit: insertCause.rit || null,
-      descripcion: insertCause.descripcion,
-      estado: insertCause.estado || "activa",
-      imputadoRut: insertCause.imputadoRut,
-      fiscalId: insertCause.fiscalId || null,
+    const regex = new RegExp(query, 'i');
+    const docs = await CauseModel.find({
       isDeleted: false,
-      createdAt: new Date().toISOString(),
-      deletedAt: null,
-    };
-    this.causes.set(id, cause);
-    return cause;
+      $or: [{ ruc: regex }, { rit: regex }, { descripcion: regex }, { imputadoRut: regex }]
+    });
+    return docs.map(d => mapDoc<Cause>(d));
   }
 
-  async updateCause(id: string, causeData: Partial<InsertCause>): Promise<Cause | undefined> {
-    const cause = this.causes.get(id);
-    if (!cause || cause.isDeleted) return undefined;
+  async createCause(cause: InsertCause): Promise<Cause> {
+    const doc = await CauseModel.create({ ...cause, isDeleted: false });
+    return mapDoc<Cause>(doc);
+  }
 
-    const updated: Cause = {
-      ...cause,
-      ruc: causeData.ruc ?? cause.ruc,
-      rit: causeData.rit !== undefined ? causeData.rit || null : cause.rit,
-      descripcion: causeData.descripcion ?? cause.descripcion,
-      estado: causeData.estado ?? cause.estado,
-      imputadoRut: causeData.imputadoRut ?? cause.imputadoRut,
-      fiscalId: causeData.fiscalId !== undefined ? causeData.fiscalId || null : cause.fiscalId,
-    };
-    this.causes.set(id, updated);
-    return updated;
+  async updateCause(id: string, cause: Partial<InsertCause>): Promise<Cause | undefined> {
+    try {
+      const doc = await CauseModel.findOneAndUpdate(
+        { _id: id, isDeleted: false }, 
+        cause, 
+        { new: true }
+      );
+      return doc ? mapDoc<Cause>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async softDeleteCause(id: string): Promise<Cause | undefined> {
-    const cause = this.causes.get(id);
-    if (!cause || cause.isDeleted) return undefined;
-
-    const updated: Cause = {
-      ...cause,
-      isDeleted: true,
-      deletedAt: new Date().toISOString(),
-    };
-    this.causes.set(id, updated);
-    return updated;
+    try {
+      const doc = await CauseModel.findByIdAndUpdate(
+        id, 
+        { isDeleted: true, deletedAt: new Date() }, 
+        { new: true }
+      );
+      return doc ? mapDoc<Cause>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async restoreCause(id: string): Promise<Cause | undefined> {
-    const cause = this.causes.get(id);
-    if (!cause || !cause.isDeleted) return undefined;
-
-    const updated: Cause = {
-      ...cause,
-      isDeleted: false,
-      deletedAt: null,
-    };
-    this.causes.set(id, updated);
-    return updated;
+    try {
+      const doc = await CauseModel.findByIdAndUpdate(
+        id, 
+        { isDeleted: false, deletedAt: null }, 
+        { new: true }
+      );
+      return doc ? mapDoc<Cause>(doc) : undefined;
+    } catch { return undefined; }
   }
 
   async permanentDeleteCause(id: string): Promise<boolean> {
-    const cause = this.causes.get(id);
-    if (!cause || !cause.isDeleted) return false;
-    return this.causes.delete(id);
+    try {
+      const result = await CauseModel.deleteOne({ _id: id });
+      return result.deletedCount === 1;
+    } catch { return false; }
   }
 
-  async createConfiscation(insertConfiscation: InsertConfiscation): Promise<Confiscation> {
-    const id = randomUUID();
-    const confiscation: Confiscation = {
-      id,
-      causeId: insertConfiscation.causeId,
-      descripcion: insertConfiscation.descripcion,
-      items: insertConfiscation.items,
-      ubicacion: insertConfiscation.ubicacion || null,
-      createdAt: new Date().toISOString(),
-    };
-    this.confiscations.set(id, confiscation);
-    return confiscation;
+  // --- INCAUTACIONES Y CITACIONES ---
+  async createConfiscation(confiscation: InsertConfiscation): Promise<Confiscation> {
+    const doc = await ConfiscationModel.create(confiscation);
+    return mapDoc<Confiscation>(doc);
   }
 
   async getConfiscationsByCauseId(causeId: string): Promise<Confiscation[]> {
-    return Array.from(this.confiscations.values()).filter(
-      (c) => c.causeId === causeId
-    );
+    const docs = await ConfiscationModel.find({ causeId });
+    return docs.map(d => mapDoc<Confiscation>(d));
   }
 
-  async createCitation(insertCitation: InsertCitation): Promise<Citation> {
-    const id = randomUUID();
-    const citation: Citation = {
-      id,
-      causeId: insertCitation.causeId,
-      citadoRut: insertCitation.citadoRut,
-      fecha: insertCitation.fecha,
-      hora: insertCitation.hora,
-      lugar: insertCitation.lugar,
-      motivo: insertCitation.motivo,
-      createdAt: new Date().toISOString(),
-    };
-    this.citations.set(id, citation);
-    return citation;
+  async createCitation(citation: InsertCitation): Promise<Citation> {
+    const doc = await CitationModel.create(citation);
+    return mapDoc<Citation>(doc);
   }
 
   async getCitationsByCauseId(causeId: string): Promise<Citation[]> {
-    return Array.from(this.citations.values()).filter(
-      (c) => c.causeId === causeId
-    );
+    const docs = await CitationModel.find({ causeId });
+    return docs.map(d => mapDoc<Citation>(d));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new MongoStorage();

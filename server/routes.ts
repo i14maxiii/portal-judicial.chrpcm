@@ -1,8 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import passport from "passport";
 import { storage } from "./storage";
-import { authenticateWithDiscord } from "./discord-auth";
+import { setupAuth } from "./discord-auth";
 import {
   insertCauseSchema,
   insertCitizenSchema,
@@ -10,71 +11,73 @@ import {
   insertConfiscationSchema,
   insertCitationSchema,
 } from "@shared/schema";
-import type { User } from "@shared/schema";
 
+// Extender tipos de sesión
 declare module "express-session" {
   interface SessionData {
     userId?: string;
   }
 }
 
+// Middleware para proteger rutas
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "No autenticado" });
+  if (req.isAuthenticated()) {
+    return next();
   }
-  next();
+  res.status(401).json({ message: "No autenticado" });
 }
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // 1. Configuración de Sesión
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "portal-judicial-secret-key",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.NODE_ENV === "production", // true solo en HTTPS
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 24 * 60 * 60 * 1000, // 24 horas
       },
     })
   );
 
-  app.get("/api/auth/discord", async (req, res) => {
-    try {
-      const user = await authenticateWithDiscord();
-      req.session.userId = user.id;
-      res.redirect("/dashboard");
-    } catch (error: any) {
-      console.error("Discord auth error:", error);
-      res.redirect("/?error=auth_failed");
-    }
-  });
+  // 2. Inicializar Autenticación (Passport)
+  setupAuth(app);
 
-  app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) {
+  // --- RUTAS DE AUTH (DISCORD) ---
+
+  // Iniciar login: Redirige a Discord
+  app.get("/api/auth/discord", passport.authenticate("discord"));
+
+  // Callback: Discord nos devuelve al usuario aquí
+  app.get("/api/auth/callback", 
+    passport.authenticate("discord", { 
+      failureRedirect: "/?error=auth_failed",
+      successRedirect: "/dashboard" 
+    })
+  );
+
+  // Obtener usuario actual (para el frontend)
+  app.get("/api/auth/me", (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
     }
-
-    const user = await storage.getUser(req.session.userId);
-    if (!user) {
-      req.session.destroy(() => {});
-      return res.status(401).json({ message: "Usuario no encontrado" });
-    }
-
-    res.json(user);
+    res.json(req.user);
   });
 
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Error al cerrar sesión" });
-      }
+  // Cerrar sesión
+  app.post("/api/auth/logout", (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
       res.json({ message: "Sesión cerrada" });
     });
   });
+
+  // --- API DEL PORTAL (PROTEGIDAS) ---
 
   app.get("/api/causes", requireAuth, async (req, res) => {
     const causes = await storage.getAllCauses();
@@ -99,7 +102,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const cause = await storage.createCause(result.data);
     res.status(201).json(cause);
   });
@@ -109,7 +111,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const cause = await storage.updateCause(req.params.id, result.data);
     if (!cause) {
       return res.status(404).json({ message: "Causa no encontrada" });
@@ -143,11 +144,9 @@ export async function registerRoutes(
 
   app.get("/api/search/:type/:query", requireAuth, async (req, res) => {
     const { type, query } = req.params;
-
     if (query.length < 2) {
       return res.json({ vehicles: [], citizens: [], causes: [] });
     }
-
     switch (type) {
       case "vehiculos": {
         const vehicles = await storage.searchVehicles(query);
@@ -176,7 +175,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const citizen = await storage.createCitizen(result.data);
     res.status(201).json(citizen);
   });
@@ -191,7 +189,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const vehicle = await storage.createVehicle(result.data);
     res.status(201).json(vehicle);
   });
@@ -201,7 +198,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const confiscation = await storage.createConfiscation(result.data);
     res.status(201).json(confiscation);
   });
@@ -216,7 +212,6 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(400).json({ message: result.error.errors[0].message });
     }
-
     const citation = await storage.createCitation(result.data);
     res.status(201).json(citation);
   });
