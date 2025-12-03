@@ -137,7 +137,7 @@ export default function CertificatePage() {
               <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-32 h-32 border-4 border-blue-900/20 rounded-full flex items-center justify-center rotate-[-15deg] pointer-events-none">
                 <div className="w-28 h-28 border border-blue-900/20 rounded-full flex items-center justify-center">
                   <span className="text-[10px] font-bold text-blue-900/20 uppercase text-center leading-none">
-                    Sistema Unificado<br/>de Justicia<br/>CHILE RP
+                    Sistema Unificado<br/>de Justicia<br/>CHRPCM
                   </span>
                 </div>
               </div>
