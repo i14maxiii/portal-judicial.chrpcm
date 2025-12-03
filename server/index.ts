@@ -3,10 +3,15 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { connectDB } from "./db"; // <--- 1. Importamos la conexión a DB
+import { connectDB } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
+
+// === CORRECCIÓN CRÍTICA PARA RENDER ===
+// Esto permite que las cookies seguras funcionen detrás del balanceador de carga
+app.set("trust proxy", 1); 
+// ======================================
 
 declare module "http" {
   interface IncomingMessage {
@@ -62,7 +67,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // 2. Inicializamos la conexión a MongoDB antes de registrar las rutas
+  // Inicializamos la conexión a MongoDB antes de registrar las rutas
   await connectDB();
   
   await registerRoutes(httpServer, app);
@@ -87,11 +92,8 @@ app.use((req, res, next) => {
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   
-  // CORRECCIÓN: Se eliminó 'reusePort: true' para compatibilidad con Windows
   httpServer.listen(
     {
       port,
