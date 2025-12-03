@@ -27,8 +27,16 @@ export const insertCitizenSchema = z.object({
   antecedentes: z.string().optional(),
 });
 export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
-export type Citizen = { id: string; rut: string; nombre: string; antecedentes: string | null; };
-
+export type Citizen = {
+  id: string;
+  rut: string;
+  nombre: string; // Se computará uniendo firstNames + lastNames
+  antecedentes: any[]; // Array de objetos
+  cuentas?: { saldo: number; tipo: string; historial: any[] }[];
+  licencias?: { tipo: string; fechaVencimiento: string }[];
+  multas?: any[];
+};
+export const warrantTypeEnum = z.enum(
 export const insertVehicleSchema = z.object({
   patente: z.string().min(1, "Patente es requerida"),
   modelo: z.string().min(1, "Modelo es requerido"),
@@ -66,7 +74,13 @@ export type Cause = {
 };
 
 // --- NUEVO: ÓRDENES JUDICIALES (Warrants) ---
-export const warrantTypeEnum = z.enum(["detencion", "allanamiento", "incautacion", "intervencion"]);
+// Agregar tipo para orden de SECRETO BANCARIO
+export const warrantTypeEnum = z.enum([
+  "detencion", 
+  "allanamiento", 
+  "incautacion", 
+  "secreto_bancario" // <--- ¡NUEVA FUNCIONALIDAD!
+]);
 export const warrantStatusEnum = z.enum(["pendiente", "aprobada", "rechazada", "ejecutada", "vencida"]);
 
 export const insertWarrantSchema = z.object({
