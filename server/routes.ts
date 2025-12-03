@@ -10,16 +10,15 @@ import {
   insertVehicleSchema,
   insertConfiscationSchema,
   insertCitationSchema,
+  insertWarrantSchema, // <--- Importante
 } from "@shared/schema";
 
-// Extender tipos de sesión
 declare module "express-session" {
   interface SessionData {
     userId?: string;
   }
 }
 
-// Middleware para proteger rutas
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated()) {
     return next();
@@ -27,35 +26,43 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ message: "No autenticado" });
 }
 
+// Middleware simple para roles (puedes mejorarlo luego)
+function requireRole(roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "No autenticado" });
+    
+    const user = req.user as any;
+    // Si es admin, pasa siempre. Si no, verifica si su rol está en la lista permitida
+    if (user.role === "admin" || roles.includes(user.role)) {
+      next();
+    } else {
+      res.status(403).json({ message: "No tienes permisos para esta acción" });
+    }
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // 1. Configuración de Sesión
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "portal-judicial-secret-key",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === "production", // true solo en HTTPS
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 24 horas
+        maxAge: 24 * 60 * 60 * 1000,
       },
     })
   );
 
-  // 2. Inicializar Autenticación (Passport)
   setupAuth(app);
 
-  // --- RUTAS DE AUTH (DISCORD) ---
-
-  // Iniciar login: Redirige a Discord
-  // (Esta se mantiene igual porque el botón del frontend apunta aquí)
+  // AUTH
   app.get("/api/auth/discord", passport.authenticate("discord"));
-
-  // Callback: Discord nos devuelve al usuario aquí
-  // CORRECCIÓN: Quitamos el prefijo '/api' para coincidir con la configuración de Discord
+  
   app.get("/auth/discord/callback", 
     passport.authenticate("discord", { 
       failureRedirect: "/?error=auth_failed",
@@ -63,7 +70,6 @@ export async function registerRoutes(
     })
   );
 
-  // Obtener usuario actual (para el frontend)
   app.get("/api/auth/me", (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
@@ -71,7 +77,6 @@ export async function registerRoutes(
     res.json(req.user);
   });
 
-  // Cerrar sesión
   app.post("/api/auth/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
@@ -79,8 +84,7 @@ export async function registerRoutes(
     });
   });
 
-  // --- API DEL PORTAL (PROTEGIDAS) ---
-
+  // --- CAUSAS ---
   app.get("/api/causes", requireAuth, async (req, res) => {
     const causes = await storage.getAllCauses();
     res.json(causes);
@@ -93,62 +97,97 @@ export async function registerRoutes(
 
   app.get("/api/causes/:id", requireAuth, async (req, res) => {
     const cause = await storage.getCause(req.params.id);
-    if (!cause) {
-      return res.status(404).json({ message: "Causa no encontrada" });
-    }
+    if (!cause) return res.status(404).json({ message: "Causa no encontrada" });
     res.json(cause);
   });
 
   app.post("/api/causes", requireAuth, async (req, res) => {
     const result = insertCauseSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
-    const cause = await storage.createCause(result.data);
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
+    
+    // Asignar el ID del fiscal creador automáticamente
+    const user = req.user as any;
+    const causeData = { ...result.data, fiscalId: user.id };
+    
+    const cause = await storage.createCause(causeData);
     res.status(201).json(cause);
   });
 
   app.put("/api/causes/:id", requireAuth, async (req, res) => {
     const result = insertCauseSchema.partial().safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     const cause = await storage.updateCause(req.params.id, result.data);
-    if (!cause) {
-      return res.status(404).json({ message: "Causa no encontrada" });
-    }
+    if (!cause) return res.status(404).json({ message: "Causa no encontrada" });
     res.json(cause);
   });
 
   app.delete("/api/causes/:id", requireAuth, async (req, res) => {
     const cause = await storage.softDeleteCause(req.params.id);
-    if (!cause) {
-      return res.status(404).json({ message: "Causa no encontrada" });
-    }
+    if (!cause) return res.status(404).json({ message: "Causa no encontrada" });
     res.json({ message: "Causa movida a papelera", cause });
   });
 
   app.post("/api/causes/:id/restore", requireAuth, async (req, res) => {
     const cause = await storage.restoreCause(req.params.id);
-    if (!cause) {
-      return res.status(404).json({ message: "Causa no encontrada en papelera" });
-    }
+    if (!cause) return res.status(404).json({ message: "Causa no encontrada en papelera" });
     res.json({ message: "Causa restaurada", cause });
   });
 
   app.delete("/api/causes/:id/permanent", requireAuth, async (req, res) => {
     const deleted = await storage.permanentDeleteCause(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ message: "Causa no encontrada en papelera" });
-    }
+    if (!deleted) return res.status(404).json({ message: "Causa no encontrada en papelera" });
     res.json({ message: "Causa eliminada permanentemente" });
   });
 
+  // --- WARRANTS (ÓRDENES JUDICIALES) ---
+  
+  // 1. Obtener órdenes de una causa
+  app.get("/api/warrants/cause/:causeId", requireAuth, async (req, res) => {
+    const warrants = await storage.getWarrantsByCause(req.params.causeId);
+    res.json(warrants);
+  });
+
+  // 2. Jueces: Ver bandeja de entrada (pendientes)
+  app.get("/api/warrants/pending", requireRole(["juez", "admin"]), async (req, res) => {
+    const warrants = await storage.getPendingWarrants();
+    res.json(warrants);
+  });
+
+  // 3. Fiscales: Solicitar orden
+  app.post("/api/warrants", requireRole(["fiscal", "juez", "admin"]), async (req, res) => {
+    const result = insertWarrantSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
+    
+    const user = req.user as any;
+    const warrantData = { ...result.data, requestedBy: user.username }; // Guardamos nombre o ID
+    
+    const warrant = await storage.createWarrant(warrantData);
+    res.status(201).json(warrant);
+  });
+
+  // 4. Jueces: Firmar/Aprobar orden
+  app.patch("/api/warrants/:id/sign", requireRole(["juez", "admin"]), async (req, res) => {
+    const user = req.user as any;
+    const warrant = await storage.updateWarrantStatus(req.params.id, "aprobada", user.username);
+    if (!warrant) return res.status(404).json({ message: "Orden no encontrada" });
+    res.json(warrant);
+  });
+
+  // 5. Jueces: Rechazar orden
+  app.patch("/api/warrants/:id/reject", requireRole(["juez", "admin"]), async (req, res) => {
+    const { reason } = req.body;
+    if (!reason) return res.status(400).json({ message: "Debe indicar motivo de rechazo" });
+    
+    const warrant = await storage.updateWarrantStatus(req.params.id, "rechazada", undefined, reason);
+    if (!warrant) return res.status(404).json({ message: "Orden no encontrada" });
+    res.json(warrant);
+  });
+
+  // --- BÚSQUEDA ---
   app.get("/api/search/:type/:query", requireAuth, async (req, res) => {
     const { type, query } = req.params;
-    if (query.length < 2) {
-      return res.json({ vehicles: [], citizens: [], causes: [] });
-    }
+    if (query.length < 2) return res.json({ vehicles: [], citizens: [], causes: [] });
+    
     switch (type) {
       case "vehiculos": {
         const vehicles = await storage.searchVehicles(query);
@@ -167,6 +206,7 @@ export async function registerRoutes(
     }
   });
 
+  // --- OTROS CRUDs ---
   app.get("/api/citizens", requireAuth, async (req, res) => {
     const citizens = await storage.getAllCitizens();
     res.json(citizens);
@@ -174,9 +214,7 @@ export async function registerRoutes(
 
   app.post("/api/citizens", requireAuth, async (req, res) => {
     const result = insertCitizenSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     const citizen = await storage.createCitizen(result.data);
     res.status(201).json(citizen);
   });
@@ -188,18 +226,14 @@ export async function registerRoutes(
 
   app.post("/api/vehicles", requireAuth, async (req, res) => {
     const result = insertVehicleSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     const vehicle = await storage.createVehicle(result.data);
     res.status(201).json(vehicle);
   });
 
   app.post("/api/confiscations", requireAuth, async (req, res) => {
     const result = insertConfiscationSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     const confiscation = await storage.createConfiscation(result.data);
     res.status(201).json(confiscation);
   });
@@ -211,9 +245,7 @@ export async function registerRoutes(
 
   app.post("/api/citations", requireAuth, async (req, res) => {
     const result = insertCitationSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: result.error.errors[0].message });
-    }
+    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     const citation = await storage.createCitation(result.data);
     res.status(201).json(citation);
   });
