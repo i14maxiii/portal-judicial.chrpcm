@@ -20,33 +20,43 @@ export type User = {
   role: UserRole;
 };
 
-// --- CIUDADANOS Y VEHÍCULOS (Sin cambios mayores) ---
+// --- CIUDADANOS ---
 export const insertCitizenSchema = z.object({
   rut: z.string().min(1, "RUT es requerido"),
   nombre: z.string().min(1, "Nombre es requerido"),
   antecedentes: z.string().optional(),
 });
+
 export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
+// Actualizamos el tipo Citizen para incluir los datos financieros del modelo Mongoose
 export type Citizen = {
   id: string;
   rut: string;
-  nombre: string; // Se computará uniendo firstNames + lastNames
-  antecedentes: any[]; // Array de objetos
+  nombre: string;
+  antecedentes: any[] | string | null; // Puede venir como string (legacy) o array (nuevo modelo)
   cuentas?: { saldo: number; tipo: string; historial: any[] }[];
   licencias?: { tipo: string; fechaVencimiento: string }[];
   multas?: any[];
 };
-export const warrantTypeEnum = z.enum(
+
+// --- VEHÍCULOS ---
 export const insertVehicleSchema = z.object({
   patente: z.string().min(1, "Patente es requerida"),
   modelo: z.string().min(1, "Modelo es requerido"),
   duenoRut: z.string().min(1, "RUT del dueño es requerido"),
 });
-export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
-export type Vehicle = { id: string; patente: string; modelo: string; duenoRut: string; };
 
-// --- CAUSAS MEJORADAS ---
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = {
+  id: string;
+  patente: string;
+  modelo: string;
+  duenoRut: string;
+};
+
+// --- CAUSAS ---
 export const causeStatusEnum = z.enum(["investigacion", "judicializada", "cerrada", "archivada"]);
+export type CauseStatus = z.infer<typeof causeStatusEnum>;
 
 export const insertCauseSchema = z.object({
   ruc: z.string().min(1, "RUC es requerido"),
@@ -64,7 +74,7 @@ export type Cause = {
   ruc: string;
   rit: string | null;
   descripcion: string;
-  estado: z.infer<typeof causeStatusEnum>;
+  estado: CauseStatus;
   imputadoRut: string;
   fiscalId: string | null;
   juezId: string | null;
@@ -73,22 +83,22 @@ export type Cause = {
   deletedAt: string | null;
 };
 
-// --- NUEVO: ÓRDENES JUDICIALES (Warrants) ---
-// Agregar tipo para orden de SECRETO BANCARIO
+// --- ÓRDENES JUDICIALES (Warrants) ---
 export const warrantTypeEnum = z.enum([
-  "detencion", 
-  "allanamiento", 
-  "incautacion", 
-  "secreto_bancario" // <--- ¡NUEVA FUNCIONALIDAD!
+  "detencion",
+  "allanamiento",
+  "incautacion",
+  "intervencion",
+  "secreto_bancario" // Incluimos la nueva funcionalidad
 ]);
 export const warrantStatusEnum = z.enum(["pendiente", "aprobada", "rechazada", "ejecutada", "vencida"]);
 
 export const insertWarrantSchema = z.object({
   causeId: z.string().min(1, "Causa vinculada requerida"),
   type: warrantTypeEnum,
-  target: z.string().min(1, "Objetivo requerido (Nombre o Dirección)"),
-  reason: z.string().min(10, "Justificación requerida para el Juez"),
-  requestedBy: z.string(), // ID del Fiscal
+  target: z.string().min(1, "Objetivo requerido"),
+  reason: z.string().min(10, "Justificación requerida"),
+  requestedBy: z.string(),
 });
 
 export type InsertWarrant = z.infer<typeof insertWarrantSchema>;
@@ -100,31 +110,53 @@ export type Warrant = {
   reason: string;
   status: z.infer<typeof warrantStatusEnum>;
   requestedBy: string;
-  signedBy: string | null; // Juez
+  signedBy: string | null;
   rejectionReason: string | null;
   createdAt: string;
   signedAt: string | null;
 };
 
-// --- OTROS (Sin cambios mayores) ---
+// --- INCAUTACIONES ---
 export const insertConfiscationSchema = z.object({
-  causeId: z.string().min(1),
-  descripcion: z.string().min(1),
-  items: z.string().min(1),
+  causeId: z.string().min(1, "Causa es requerida"),
+  descripcion: z.string().min(1, "Descripción es requerida"),
+  items: z.string().min(1, "Items incautados son requeridos"),
   ubicacion: z.string().optional(),
 });
+
 export type InsertConfiscation = z.infer<typeof insertConfiscationSchema>;
-export type Confiscation = { id: string; causeId: string; descripcion: string; items: string; ubicacion: string | null; createdAt: string; };
+export type Confiscation = {
+  id: string;
+  causeId: string;
+  descripcion: string;
+  items: string;
+  ubicacion: string | null;
+  createdAt: string;
+};
 
+// --- CITACIONES ---
 export const insertCitationSchema = z.object({
-  causeId: z.string().min(1),
-  citadoRut: z.string().min(1),
-  fecha: z.string().min(1),
-  hora: z.string().min(1),
-  lugar: z.string().min(1),
-  motivo: z.string().min(1),
+  causeId: z.string().min(1, "Causa es requerida"),
+  citadoRut: z.string().min(1, "RUT del citado es requerido"),
+  fecha: z.string().min(1, "Fecha es requerida"),
+  hora: z.string().min(1, "Hora es requerida"),
+  lugar: z.string().min(1, "Lugar es requerido"),
+  motivo: z.string().min(1, "Motivo es requerido"),
 });
-export type InsertCitation = z.infer<typeof insertCitationSchema>;
-export type Citation = { id: string; causeId: string; citadoRut: string; fecha: string; hora: string; lugar: string; motivo: string; createdAt: string; };
 
-export type SearchResult = { type: "citizen" | "vehicle" | "cause"; data: Citizen | Vehicle | Cause; };
+export type InsertCitation = z.infer<typeof insertCitationSchema>;
+export type Citation = {
+  id: string;
+  causeId: string;
+  citadoRut: string;
+  fecha: string;
+  hora: string;
+  lugar: string;
+  motivo: string;
+  createdAt: string;
+};
+
+export type SearchResult = {
+  type: "citizen" | "vehicle" | "cause";
+  data: Citizen | Vehicle | Cause;
+};
