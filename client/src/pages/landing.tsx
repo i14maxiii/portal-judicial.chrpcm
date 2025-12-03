@@ -2,6 +2,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Link } from "wouter"; // Importamos Link para la navegación
 import {
   Scale,
   Search,
@@ -21,12 +22,11 @@ export default function LandingPage() {
       
       {/* HEADER INSTITUCIONAL */}
       <section className="relative bg-[#1e293b] text-white py-16 overflow-hidden border-b-4 border-[#C5A572] shadow-xl">
-        {/* Fondo sutil abstracto, sin rejillas tech */}
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
         
         <div className="container mx-auto px-4 relative z-10 text-center">
           <div className="inline-block p-4 rounded-full bg-white/10 mb-6 border border-white/20 backdrop-blur-sm">
-            <Scale className="h-16 w-16 text-[#C5A572]" /> {/* Dorado */}
+            <Scale className="h-16 w-16 text-[#C5A572]" /> 
           </div>
           
           <h1 className="text-4xl md:text-5xl font-serif font-bold mb-2 tracking-wide">
@@ -50,7 +50,7 @@ export default function LandingPage() {
       <section className="flex-1 container mx-auto px-4 py-12 -mt-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          {/* TARJETA 1: PÚBLICO */}
+          {/* TARJETA 1: PÚBLICO (CIUDADANOS) */}
           <Card className="hover:shadow-lg transition-all border-t-4 border-t-blue-600">
             <CardHeader>
               <CardTitle className="flex items-center gap-3 text-xl font-serif">
@@ -60,15 +60,27 @@ export default function LandingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Acceso ciudadano para verificar estado de causas no reservadas y consulta de antecedentes públicos.
+                Servicios para la ciudadanía: Consultas de causas y certificados.
               </p>
               <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-between group">
-                  Buscar Causa (RUC/RIT) <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition" />
+                {/* Ahora los botones son Links reales */}
+                <Link href="/busqueda?tipo=causas">
+                  <Button variant="outline" className="w-full justify-between group mb-2">
+                    Buscar Causa (RUC/RIT) <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition" />
+                  </Button>
+                </Link>
+                
+                {/* Botón para Certificados (Requiere Login Ciudadano) */}
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-between group text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100"
+                  onClick={login}
+                >
+                  Acceso Ciudadano / Certificados <ArrowRight className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" className="w-full justify-between group">
-                  Certificado Antecedentes <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition" />
-                </Button>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  * Requiere inicio de sesión con su identidad digital (Discord)
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -86,7 +98,7 @@ export default function LandingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Ingreso exclusivo para Fiscales, Jueces y personal administrativo mediante credenciales seguras.
+                Ingreso exclusivo para Fiscales, Jueces y personal administrativo.
               </p>
               <Button 
                 onClick={login} 
@@ -107,7 +119,7 @@ export default function LandingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Canales de atención para abogados y civiles.
+                Canales de atención.
               </p>
               <div className="text-sm space-y-3">
                 <div className="flex items-center gap-2 text-slate-700">
@@ -126,7 +138,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER BUROCRÁTICO */}
       <footer className="bg-white border-t py-8">
         <div className="container mx-auto px-4 text-center">
           <Scale className="h-6 w-6 mx-auto text-gray-400 mb-3" />
@@ -138,9 +149,8 @@ export default function LandingPage() {
           </p>
           <Separator className="my-4 max-w-[200px] mx-auto" />
           <p className="text-[10px] text-gray-400 max-w-md mx-auto leading-normal">
-            Este sistema es de uso exclusivo para fines de Roleplay en el servidor. 
-            Cualquier similitud con sistemas reales es coincidencia. 
-            Versión del Sistema: 2.5.0 (Build 2025)
+            Este sistema es de uso exclusivo para fines de Roleplay.
+            Versión del Sistema: 2.5.1 (Build 2025)
           </p>
         </div>
       </footer>
