@@ -115,12 +115,19 @@ const userSchema = new mongoose.Schema({
     role: { type: String, default: "civil" },
 });
 
-// CAUSAS
+// CAUSAS (Expedientes)
 const causeSchema = new mongoose.Schema({
+    caratula: { type: String, required: true },
     ruc: { type: String, required: true },
     rit: { type: String },
+    
+    // CAMPOS RECUPERADOS
+    origen: { type: String, default: "Fiscalía" },
+    materia: { type: String, default: "Penal" },
+    
     descripcion: { type: String, required: true },
     estado: { type: String, default: "investigacion" },
+    prioridad: { type: String, default: "normal" },
     imputadoRut: { type: String, required: true },
     fiscalId: { type: String },
     juezId: { type: String },
