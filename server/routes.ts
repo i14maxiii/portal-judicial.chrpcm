@@ -51,10 +51,12 @@ export async function registerRoutes(
   // --- RUTAS DE AUTH (DISCORD) ---
 
   // Iniciar login: Redirige a Discord
+  // (Esta se mantiene igual porque el botón del frontend apunta aquí)
   app.get("/api/auth/discord", passport.authenticate("discord"));
 
   // Callback: Discord nos devuelve al usuario aquí
-  app.get("/api/auth/callback", 
+  // CORRECCIÓN: Quitamos el prefijo '/api' para coincidir con la configuración de Discord
+  app.get("/auth/discord/callback", 
     passport.authenticate("discord", { 
       failureRedirect: "/?error=auth_failed",
       successRedirect: "/dashboard" 
