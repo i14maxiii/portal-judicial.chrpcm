@@ -10,7 +10,7 @@ import {
   insertVehicleSchema,
   insertConfiscationSchema,
   insertCitationSchema,
-  insertWarrantSchema, // <--- Importante
+  insertWarrantSchema,
 } from "@shared/schema";
 
 declare module "express-session" {
@@ -26,13 +26,11 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ message: "No autenticado" });
 }
 
-// Middleware simple para roles (puedes mejorarlo luego)
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "No autenticado" });
     
     const user = req.user as any;
-    // Si es admin, pasa siempre. Si no, verifica si su rol está en la lista permitida
     if (user.role === "admin" || roles.includes(user.role)) {
       next();
     } else {
@@ -105,7 +103,6 @@ export async function registerRoutes(
     const result = insertCauseSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
     
-    // Asignar el ID del fiscal creador automáticamente
     const user = req.user as any;
     const causeData = { ...result.data, fiscalId: user.id };
     
@@ -141,31 +138,37 @@ export async function registerRoutes(
 
   // --- WARRANTS (ÓRDENES JUDICIALES) ---
   
-  // 1. Obtener órdenes de una causa
   app.get("/api/warrants/cause/:causeId", requireAuth, async (req, res) => {
     const warrants = await storage.getWarrantsByCause(req.params.causeId);
     res.json(warrants);
   });
 
-  // 2. Jueces: Ver bandeja de entrada (pendientes)
   app.get("/api/warrants/pending", requireRole(["juez", "admin"]), async (req, res) => {
     const warrants = await storage.getPendingWarrants();
     res.json(warrants);
   });
 
-  // 3. Fiscales: Solicitar orden
+  // CORRECCIÓN AQUÍ: Usamos .omit() para no exigir 'requestedBy' al cliente
   app.post("/api/warrants", requireRole(["fiscal", "juez", "admin"]), async (req, res) => {
-    const result = insertWarrantSchema.safeParse(req.body);
-    if (!result.success) return res.status(400).json({ message: result.error.errors[0].message });
+    // Validamos todo MENOS requestedBy (porque lo ponemos nosotros)
+    const result = insertWarrantSchema.omit({ requestedBy: true }).safeParse(req.body);
+    
+    if (!result.success) {
+        console.error("Error validación warrants:", result.error);
+        return res.status(400).json({ message: result.error.errors[0].message });
+    }
     
     const user = req.user as any;
-    const warrantData = { ...result.data, requestedBy: user.username }; // Guardamos nombre o ID
+    // Aquí inyectamos el nombre del usuario
+    const warrantData = { 
+        ...result.data, 
+        requestedBy: user.username // O user.discordId si prefieres
+    }; 
     
     const warrant = await storage.createWarrant(warrantData);
     res.status(201).json(warrant);
   });
 
-  // 4. Jueces: Firmar/Aprobar orden
   app.patch("/api/warrants/:id/sign", requireRole(["juez", "admin"]), async (req, res) => {
     const user = req.user as any;
     const warrant = await storage.updateWarrantStatus(req.params.id, "aprobada", user.username);
@@ -173,7 +176,6 @@ export async function registerRoutes(
     res.json(warrant);
   });
 
-  // 5. Jueces: Rechazar orden
   app.patch("/api/warrants/:id/reject", requireRole(["juez", "admin"]), async (req, res) => {
     const { reason } = req.body;
     if (!reason) return res.status(400).json({ message: "Debe indicar motivo de rechazo" });
