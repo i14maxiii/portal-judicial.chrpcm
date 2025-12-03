@@ -28,12 +28,11 @@ export const insertCitizenSchema = z.object({
 });
 
 export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
-// Actualizamos el tipo Citizen para incluir los datos financieros del modelo Mongoose
 export type Citizen = {
   id: string;
   rut: string;
   nombre: string;
-  antecedentes: any[] | string | null; // Puede venir como string (legacy) o array (nuevo modelo)
+  antecedentes: any[] | string | null;
   cuentas?: { saldo: number; tipo: string; historial: any[] }[];
   licencias?: { tipo: string; fechaVencimiento: string }[];
   multas?: any[];
@@ -54,15 +53,28 @@ export type Vehicle = {
   duenoRut: string;
 };
 
-// --- CAUSAS ---
+// --- CAUSAS (CORREGIDO Y COMPLETO) ---
+// Recuperamos las listas originales de tu versión EJS
 export const causeStatusEnum = z.enum(["investigacion", "judicializada", "cerrada", "archivada"]);
+export const causePriorityEnum = z.enum(["normal", "alta", "urgente"]);
+export const causeOriginEnum = z.enum(["Fiscalía", "Juzgado de Garantía", "Tribunal Oral", "Corte Suprema", "Querella Civil"]);
+export const causeMateriaEnum = z.enum(["Penal", "Civil", "Familia", "Laboral", "Corte Suprema"]);
+
 export type CauseStatus = z.infer<typeof causeStatusEnum>;
 
 export const insertCauseSchema = z.object({
+  caratula: z.string().min(5, "La carátula es obligatoria"),
   ruc: z.string().min(1, "RUC es requerido"),
   rit: z.string().optional(),
+  
+  // Nuevos campos recuperados
+  origen: causeOriginEnum.default("Fiscalía"),
+  materia: causeMateriaEnum.default("Penal"),
+  
   descripcion: z.string().min(1, "Descripción es requerida"),
-  estado: causeStatusEnum.default("investigacion"),
+  estado: causeStatusEnum.default("investigacion"), // Ahora seleccionable
+  prioridad: causePriorityEnum.default("normal"),
+  
   imputadoRut: z.string().min(1, "RUT del imputado es requerido"),
   fiscalId: z.string().optional(),
   juezId: z.string().optional(),
@@ -71,10 +83,14 @@ export const insertCauseSchema = z.object({
 export type InsertCause = z.infer<typeof insertCauseSchema>;
 export type Cause = {
   id: string;
+  caratula: string;
   ruc: string;
   rit: string | null;
+  origen: string; // Nuevo
+  materia: string; // Nuevo
   descripcion: string;
   estado: CauseStatus;
+  prioridad: string;
   imputadoRut: string;
   fiscalId: string | null;
   juezId: string | null;
@@ -83,13 +99,13 @@ export type Cause = {
   deletedAt: string | null;
 };
 
-// --- ÓRDENES JUDICIALES (Warrants) ---
+// --- ÓRDENES JUDICIALES ---
 export const warrantTypeEnum = z.enum([
   "detencion",
   "allanamiento",
   "incautacion",
   "intervencion",
-  "secreto_bancario" // Incluimos la nueva funcionalidad
+  "secreto_bancario"
 ]);
 export const warrantStatusEnum = z.enum(["pendiente", "aprobada", "rechazada", "ejecutada", "vencida"]);
 
@@ -132,6 +148,7 @@ export type Confiscation = {
   items: string;
   ubicacion: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 // --- CITACIONES ---
@@ -154,6 +171,7 @@ export type Citation = {
   lugar: string;
   motivo: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type SearchResult = {
