@@ -52,23 +52,27 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 md:px-6">
         <div className="flex h-16 md:h-20 items-center justify-between gap-4">
           <div className="flex items-center gap-4">
+            
+            {/* INICIO CORRECCIÓN LOGO */}
             <Link href={isAuthenticated ? "/dashboard" : "/"}>
-
-              <div className="flex items-center gap-3 hover:bg-slate-100/10 rounded-md px-3 py-2 transition-colors">
- 
+              <a className="flex items-center gap-3 hover:bg-slate-100/10 rounded-md px-3 py-2 transition-colors">
                 {/* Logo Institucional (Escudo abstracto) */}
-  <div className="flex h-10 w-10 items-center justify-center rounded bg-[#1e293b] border border-[#C5A572] text-[#C5A572]">
-    <Scale className="h-6 w-6" />
-  </div>
-  <div className="hidden sm:block">
-    <p className="text-sm font-serif font-bold leading-none text-foreground uppercase tracking-wide">
-      SUJ
-    </p>
-    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
-      Portal Judicial
-    </p>
-  </div>
-</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded bg-[#1e293b] border border-[#C5A572] text-[#C5A572]">
+                  <Scale className="h-6 w-6" />
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-serif font-bold leading-none text-foreground uppercase tracking-wide">
+                    SUJ
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                    Portal Judicial
+                  </p>
+                </div>
+              </a>
+            </Link>
+            {/* FIN CORRECCIÓN LOGO */}
+
+          </div>
 
           {isAuthenticated && (
             <nav className="hidden md:flex items-center gap-1">
