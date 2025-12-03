@@ -1,11 +1,10 @@
-import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { insertCauseSchema, type InsertCause } from "@shared/schema";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import {
   Form,
   FormControl,
@@ -15,17 +14,11 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertCauseSchema, type InsertCause } from "@shared/schema";
-import { ArrowLeft, FileText, Scale, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
 export default function CauseNewPage() {
@@ -38,120 +31,79 @@ export default function CauseNewPage() {
       ruc: "",
       rit: "",
       descripcion: "",
-      estado: "activa",
       imputadoRut: "",
-      fiscalId: "",
+      estado: "investigacion", // <--- CORRECCIÓN IMPORTANTE AQUÍ
     },
   });
 
-  const createCause = useMutation({
+  const mutation = useMutation({
     mutationFn: async (data: InsertCause) => {
-      const response = await apiRequest("POST", "/api/causes", data);
-      return response.json();
+      const res = await apiRequest("POST", "/api/causes", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/causes"] });
       toast({
         title: "Causa creada",
-        description: "La causa ha sido registrada exitosamente.",
+        description: "El expediente ha sido ingresado correctamente.",
       });
       navigate("/causas");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error al crear causa",
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: InsertCause) => {
-    createCause.mutate(data);
-  };
+  function onSubmit(data: InsertCause) {
+    mutation.mutate(data);
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-3xl px-4 md:px-6 py-8">
-        <div className="mb-8">
-          <Link href="/causas">
-            <Button variant="ghost" className="mb-4" data-testid="button-back">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver a Causas
-            </Button>
-          </Link>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-            Ingresar Nueva Causa
-          </h1>
-          <p className="text-muted-foreground">
-            Complete el formulario para registrar una nueva causa judicial.
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#F8F9FA] p-4 md:p-8">
+      <div className="mx-auto max-w-2xl">
+        <Link href="/causas">
+          <Button variant="ghost" className="mb-4 gap-2">
+            <ArrowLeft className="h-4 w-4" /> Volver
+          </Button>
+        </Link>
 
         <Card>
-          <CardHeader className="border-b border-border">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Scale className="h-6 w-6" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">Formulario de Ingreso</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Poder Judicial - Ministerio Público
-                </p>
-              </div>
-            </div>
+          <CardHeader>
+            <CardTitle className="text-2xl font-serif">Ingresar Nueva Causa</CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent>
             <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
-              >
-                <div className="grid gap-6 md:grid-cols-2">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="ruc"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium uppercase tracking-wide">
-                          RUC <span className="text-destructive">*</span>
-                        </FormLabel>
+                        <FormLabel>RUC (Rol Único)</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="2300123456-7"
-                            className="font-mono h-12"
-                            {...field}
-                            data-testid="input-ruc"
-                          />
+                          <Input placeholder="Ej: 2400123456-7" {...field} />
                         </FormControl>
-                        <FormDescription className="text-xs">
-                          Rol Único de Causa
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
+                  
                   <FormField
                     control={form.control}
                     name="rit"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium uppercase tracking-wide">
-                          RIT
-                        </FormLabel>
+                        <FormLabel>RIT (Tribunal)</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="O-123-2024"
-                            className="font-mono h-12"
-                            {...field}
-                            data-testid="input-rit"
-                          />
+                          <Input placeholder="Opcional" {...field} value={field.value || ''} />
                         </FormControl>
-                        <FormDescription className="text-xs">
-                          Rol Interno del Tribunal
-                        </FormDescription>
+                        <FormDescription>Solo si ya está judicializada</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -163,49 +115,10 @@ export default function CauseNewPage() {
                   name="imputadoRut"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium uppercase tracking-wide">
-                        RUT del Imputado <span className="text-destructive">*</span>
-                      </FormLabel>
+                      <FormLabel>RUT Imputado</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="12.345.678-9"
-                          className="font-mono h-12"
-                          {...field}
-                          data-testid="input-imputado-rut"
-                        />
+                        <Input placeholder="12.345.678-9" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="estado"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium uppercase tracking-wide">
-                        Estado de la Causa
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger
-                            className="h-12"
-                            data-testid="select-estado"
-                          >
-                            <SelectValue placeholder="Seleccione un estado" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="activa">Activa</SelectItem>
-                          <SelectItem value="pendiente">Pendiente</SelectItem>
-                          <SelectItem value="cerrada">Cerrada</SelectItem>
-                          <SelectItem value="archivada">Archivada</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -216,51 +129,26 @@ export default function CauseNewPage() {
                   name="descripcion"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium uppercase tracking-wide">
-                        Descripción <span className="text-destructive">*</span>
-                      </FormLabel>
+                      <FormLabel>Hechos del Caso</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Detalle los hechos y circunstancias de la causa..."
-                          className="min-h-[120px] resize-none"
-                          {...field}
-                          data-testid="textarea-descripcion"
+                        <Textarea 
+                          placeholder="Describa los hechos constitutivos de delito..." 
+                          className="min-h-[120px]"
+                          {...field} 
                         />
                       </FormControl>
-                      <FormDescription className="text-xs">
-                        Proporcione una descripción detallada de los hechos
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="flex items-center justify-end gap-4 pt-6 border-t border-border">
-                  <Link href="/causas">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      data-testid="button-cancel"
-                    >
-                      Cancelar
-                    </Button>
-                  </Link>
-                  <Button
-                    type="submit"
-                    disabled={createCause.isPending}
-                    data-testid="button-submit"
-                  >
-                    {createCause.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Registrar Causa
-                      </>
-                    )}
+                <div className="flex justify-end gap-4 pt-4">
+                  <Button type="button" variant="outline" onClick={() => navigate("/causas")}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" className="bg-[#1e293b]" disabled={mutation.isPending}>
+                    {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Crear Expediente
                   </Button>
                 </div>
               </form>
