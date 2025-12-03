@@ -1,32 +1,36 @@
 import { 
   UserModel, CitizenModel, VehicleModel, CauseModel, 
-  ConfiscationModel, CitationModel 
+  ConfiscationModel, CitationModel, WarrantModel 
 } from "./models";
 import type { 
   User, InsertUser, Citizen, InsertCitizen, 
   Vehicle, InsertVehicle, Cause, InsertCause, 
-  Confiscation, InsertConfiscation, Citation, InsertCitation 
+  Confiscation, InsertConfiscation, Citation, InsertCitation,
+  Warrant, InsertWarrant 
 } from "@shared/schema";
 
-// 1. DEFINICIÓN DE LA INTERFAZ (Esto faltaba y causaba el error)
 export interface IStorage {
+  // Usuarios
   getUser(id: string): Promise<User | undefined>;
   getUserByDiscordId(discordId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
 
+  // Ciudadanos
   getCitizen(id: string): Promise<Citizen | undefined>;
   getCitizenByRut(rut: string): Promise<Citizen | undefined>;
   searchCitizens(query: string): Promise<Citizen[]>;
   createCitizen(citizen: InsertCitizen): Promise<Citizen>;
   getAllCitizens(): Promise<Citizen[]>;
 
+  // Vehículos
   getVehicle(id: string): Promise<Vehicle | undefined>;
   getVehicleByPatente(patente: string): Promise<Vehicle | undefined>;
   searchVehicles(query: string): Promise<Vehicle[]>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   getAllVehicles(): Promise<Vehicle[]>;
 
+  // Causas
   getCause(id: string): Promise<Cause | undefined>;
   getAllCauses(): Promise<Cause[]>;
   getDeletedCauses(): Promise<Cause[]>;
@@ -37,14 +41,19 @@ export interface IStorage {
   restoreCause(id: string): Promise<Cause | undefined>;
   permanentDeleteCause(id: string): Promise<boolean>;
 
+  // Órdenes Judiciales (Warrants)
+  createWarrant(warrant: InsertWarrant): Promise<Warrant>;
+  getWarrantsByCause(causeId: string): Promise<Warrant[]>;
+  getPendingWarrants(): Promise<Warrant[]>;
+  updateWarrantStatus(id: string, status: string, signedBy?: string, rejectionReason?: string): Promise<Warrant | undefined>;
+
+  // Otros
   createConfiscation(confiscation: InsertConfiscation): Promise<Confiscation>;
   getConfiscationsByCauseId(causeId: string): Promise<Confiscation[]>;
-
   createCitation(citation: InsertCitation): Promise<Citation>;
   getCitationsByCauseId(causeId: string): Promise<Citation[]>;
 }
 
-// 2. HELPER PARA MAPEAR DOCUMENTOS DE MONGO A OBJETOS
 const mapDoc = <T>(doc: any): T => {
   if (!doc) return doc;
   const obj = doc.toObject();
@@ -54,7 +63,6 @@ const mapDoc = <T>(doc: any): T => {
   return obj as T;
 };
 
-// 3. IMPLEMENTACIÓN DE MONGO STORAGE
 export class MongoStorage implements IStorage {
   // --- USUARIOS ---
   async getUser(id: string): Promise<User | undefined> {
@@ -97,9 +105,17 @@ export class MongoStorage implements IStorage {
   async searchCitizens(query: string): Promise<Citizen[]> {
     const regex = new RegExp(query, 'i');
     const docs = await CitizenModel.find({
-      $or: [{ rut: regex }, { nombre: regex }]
+      $or: [{ rut: regex }, { username: regex }, { firstNames: regex }, { lastNames: regex }]
     });
-    return docs.map(d => mapDoc<Citizen>(d));
+    // Mapeo especial para construir el nombre completo si viene del modelo complejo
+    return docs.map(d => {
+      const obj = mapDoc<any>(d);
+      // Si tiene firstNames/lastNames, construimos "nombre" para compatibilidad
+      if (!obj.nombre && obj.firstNames) {
+        obj.nombre = `${obj.firstNames.join(" ")} ${obj.lastNames.join(" ")}`.trim();
+      }
+      return obj as Citizen;
+    });
   }
 
   async createCitizen(citizen: InsertCitizen): Promise<Citizen> {
@@ -108,7 +124,7 @@ export class MongoStorage implements IStorage {
   }
 
   async getAllCitizens(): Promise<Citizen[]> {
-    const docs = await CitizenModel.find();
+    const docs = await CitizenModel.find().limit(50); // Limitamos para no explotar
     return docs.map(d => mapDoc<Citizen>(d));
   }
 
@@ -121,25 +137,36 @@ export class MongoStorage implements IStorage {
   }
 
   async getVehicleByPatente(patente: string): Promise<Vehicle | undefined> {
-    const doc = await VehicleModel.findOne({ patente });
+    const doc = await VehicleModel.findOne({ placa: patente }); // Ojo: tu modelo usa 'placa'
     return doc ? mapDoc<Vehicle>(doc) : undefined;
   }
 
   async searchVehicles(query: string): Promise<Vehicle[]> {
     const regex = new RegExp(query, 'i');
+    // Buscamos por placa (patente) o modelo
     const docs = await VehicleModel.find({
-      $or: [{ patente: regex }, { modelo: regex }, { duenoRut: regex }]
+      $or: [{ placa: regex }, { modelo: regex }, { rut: regex }]
     });
-    return docs.map(d => mapDoc<Vehicle>(d));
+    return docs.map(d => {
+      const obj = mapDoc<any>(d);
+      // Mapeamos 'placa' a 'patente' si es necesario para el frontend
+      if (obj.placa && !obj.patente) obj.patente = obj.placa;
+      if (obj.rut && !obj.duenoRut) obj.duenoRut = obj.rut;
+      return obj as Vehicle;
+    });
   }
 
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
-    const doc = await VehicleModel.create(vehicle);
+    const doc = await VehicleModel.create({
+        ...vehicle,
+        placa: vehicle.patente, // Adaptador
+        rut: vehicle.duenoRut
+    });
     return mapDoc<Vehicle>(doc);
   }
 
   async getAllVehicles(): Promise<Vehicle[]> {
-    const docs = await VehicleModel.find();
+    const docs = await VehicleModel.find().limit(50);
     return docs.map(d => mapDoc<Vehicle>(d));
   }
 
@@ -215,7 +242,48 @@ export class MongoStorage implements IStorage {
     } catch { return false; }
   }
 
-  // --- INCAUTACIONES Y CITACIONES ---
+  // --- WARRANTS (ÓRDENES) ---
+  async createWarrant(warrant: InsertWarrant): Promise<Warrant> {
+    const doc = await WarrantModel.create({
+      ...warrant,
+      status: "pendiente",
+      createdAt: new Date()
+    });
+    return mapDoc<Warrant>(doc);
+  }
+
+  async getWarrantsByCause(causeId: string): Promise<Warrant[]> {
+    const docs = await WarrantModel.find({ causeId }).sort({ createdAt: -1 });
+    return docs.map(d => mapDoc<Warrant>(d));
+  }
+
+  async getPendingWarrants(): Promise<Warrant[]> {
+    const docs = await WarrantModel.find({ status: "pendiente" }).sort({ createdAt: 1 });
+    return docs.map(d => mapDoc<Warrant>(d));
+  }
+
+  async updateWarrantStatus(
+    id: string, 
+    status: string, 
+    signedBy?: string, 
+    rejectionReason?: string
+  ): Promise<Warrant | undefined> {
+    const updateData: any = { status };
+    
+    if (status === "aprobada" && signedBy) {
+      updateData.signedBy = signedBy;
+      updateData.signedAt = new Date();
+    }
+    
+    if (status === "rechazada" && rejectionReason) {
+      updateData.rejectionReason = rejectionReason;
+    }
+    
+    const doc = await WarrantModel.findByIdAndUpdate(id, updateData, { new: true });
+    return doc ? mapDoc<Warrant>(doc) : undefined;
+  }
+
+  // --- OTROS ---
   async createConfiscation(confiscation: InsertConfiscation): Promise<Confiscation> {
     const doc = await ConfiscationModel.create(confiscation);
     return mapDoc<Confiscation>(doc);
