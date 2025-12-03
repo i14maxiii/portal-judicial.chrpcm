@@ -53,22 +53,22 @@ export function Navbar() {
         <div className="flex h-16 md:h-20 items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href={isAuthenticated ? "/dashboard" : "/"}>
-              <a
-                className="flex items-center gap-3 hover-elevate rounded-md px-2 py-1"
-                data-testid="link-home"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <Scale className="h-5 w-5" />
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-semibold tracking-tight">
-                    Portal Judicial
-                  </p>
-                  <p className="text-xs text-muted-foreground">Fiscalía RP</p>
-                </div>
-              </a>
-            </Link>
-          </div>
+
+              <div className="flex items-center gap-3 hover:bg-slate-100/10 rounded-md px-3 py-2 transition-colors">
+ 
+                {/* Logo Institucional (Escudo abstracto) */}
+  <div className="flex h-10 w-10 items-center justify-center rounded bg-[#1e293b] border border-[#C5A572] text-[#C5A572]">
+    <Scale className="h-6 w-6" />
+  </div>
+  <div className="hidden sm:block">
+    <p className="text-sm font-serif font-bold leading-none text-foreground uppercase tracking-wide">
+      SUJ
+    </p>
+    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+      Portal Judicial
+    </p>
+  </div>
+</div>
 
           {isAuthenticated && (
             <nav className="hidden md:flex items-center gap-1">
