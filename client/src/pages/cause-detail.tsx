@@ -1,3 +1,4 @@
+// ... imports iguales ...
 import { useState } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog"; // AÑADIDO DialogDescription
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +32,7 @@ import {
 
 // Icons
 import {
-  ArrowLeft, FileText, Scale, Trash2, Edit, Calendar, User, Hash,
+  ArrowLeft, Scale, Trash2, Edit, Calendar, User,
   Loader2, Gavel, FileSearch, ShieldAlert, CheckCircle2, XCircle
 } from "lucide-react";
 
@@ -42,16 +43,13 @@ export default function CauseDetailPage() {
   const { user } = useAuth();
   const causeId = params?.id;
 
-  // Estado para formularios
   const [warrantOpen, setWarrantOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [selectedWarrantId, setSelectedWarrantId] = useState<string | null>(null);
   
-  // Form Data
   const [warrantForm, setWarrantForm] = useState({ type: "detencion", target: "", reason: "" });
   const [rejectReason, setRejectReason] = useState("");
 
-  // Queries
   const { data: cause, isLoading: loadingCause } = useQuery<Cause>({
     queryKey: ["/api/causes", causeId],
     enabled: !!causeId,
@@ -65,7 +63,6 @@ export default function CauseDetailPage() {
   const isJudge = user?.role === "juez" || user?.role === "admin";
   const isFiscal = user?.role === "fiscal" || user?.role === "admin";
 
-  // Mutations
   const createWarrant = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/warrants", { ...warrantForm, causeId });
@@ -86,7 +83,7 @@ export default function CauseDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/warrants/cause", causeId] });
-      toast({ title: "Orden Firmada", description: "La orden ha sido aprobada y es ejecutable.", className: "bg-green-600 text-white" });
+      toast({ title: "Orden Firmada", description: "La orden ha sido aprobada.", className: "bg-green-600 text-white" });
     }
   });
 
@@ -121,7 +118,6 @@ export default function CauseDetailPage() {
     <div className="min-h-screen bg-[#F8F9FA]">
       <div className="mx-auto max-w-6xl px-4 py-8">
         
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <Link href="/causas">
             <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4" /> Volver</Button>
@@ -132,7 +128,6 @@ export default function CauseDetailPage() {
                 <Button variant="outline" size="sm" className="gap-2"><Edit className="h-4 w-4" /> Editar</Button>
               </Link>
             )}
-            {/* Solo admin borra definitivamente */}
             {user?.role === "admin" && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -150,7 +145,6 @@ export default function CauseDetailPage() {
           </div>
         </div>
 
-        {/* INFO CARD */}
         <Card className="mb-8 border-t-4 border-t-[#C5A572] shadow-sm">
           <CardHeader className="bg-white">
             <div className="flex justify-between items-start">
@@ -161,7 +155,7 @@ export default function CauseDetailPage() {
                 <div>
                   <div className="flex gap-3 items-center mb-1">
                     <CardTitle className="text-2xl font-serif font-bold text-slate-800">{cause.ruc}</CardTitle>
-                    <Badge variant={cause.estado === 'activa' ? 'default' : 'secondary'}>{cause.estado.toUpperCase()}</Badge>
+                    <Badge variant={cause.estado === 'investigacion' ? 'default' : 'secondary'}>{cause.estado.toUpperCase()}</Badge>
                   </div>
                   <CardDescription className="font-mono text-xs">ID INTERNO: {cause.id}</CardDescription>
                   {cause.rit && <p className="text-sm font-bold text-slate-600 mt-1">RIT TRIBUNAL: {cause.rit}</p>}
@@ -195,21 +189,19 @@ export default function CauseDetailPage() {
           </CardContent>
         </Card>
 
-        {/* TABS PRINCIPALES */}
         <Tabs defaultValue="ordenes" className="w-full">
           <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-6">
             <TabsTrigger value="ordenes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#C5A572] data-[state=active]:bg-transparent py-3">
-              Despacho Judicial (Órdenes)
+              Despacho Judicial
             </TabsTrigger>
             <TabsTrigger value="evidencia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#C5A572] data-[state=active]:bg-transparent py-3">
               Evidencia Digital
             </TabsTrigger>
             <TabsTrigger value="historial" className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#C5A572] data-[state=active]:bg-transparent py-3">
-              Historial de Actuaciones
+              Historial
             </TabsTrigger>
           </TabsList>
 
-          {/* TAB: ÓRDENES JUDICIALES */}
           <TabsContent value="ordenes" className="mt-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-serif font-bold flex items-center gap-2">
@@ -223,6 +215,9 @@ export default function CauseDetailPage() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Solicitud de Orden Judicial</DialogTitle>
+                      <DialogDescription>
+                        Complete el formulario para solicitar una orden al tribunal. Sea específico en la justificación.
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
@@ -231,16 +226,16 @@ export default function CauseDetailPage() {
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="detencion">Orden de Detención</SelectItem>
-                            <SelectItem value="allanamiento">Orden de Allanamiento (Entrada y Registro)</SelectItem>
-                            <SelectItem value="incautacion">Incautación de Vehículo/Bien</SelectItem>
+                            <SelectItem value="allanamiento">Orden de Allanamiento</SelectItem>
+                            <SelectItem value="incautacion">Incautación de Bien</SelectItem>
                             <SelectItem value="secreto_bancario">Levantamiento Secreto Bancario</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Objetivo (Persona, Dirección o Patente)</Label>
+                        <Label>Objetivo</Label>
                         <Input 
-                          placeholder="Ej: 12.345.678-9 o Calle Falsa 123" 
+                          placeholder="Ej: 12.345.678-9 o Dirección" 
                           value={warrantForm.target}
                           onChange={(e) => setWarrantForm({...warrantForm, target: e.target.value})}
                         />
@@ -277,17 +272,15 @@ export default function CauseDetailPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="uppercase font-bold">{w.type.replace('_', ' ')}</Badge>
-                          {w.status === 'pendiente' && <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pendiente de Firma</Badge>}
-                          {w.status === 'aprobada' && <Badge className="bg-green-100 text-green-800 hover:bg-green-100 flex gap-1"><CheckCircle2 className="h-3 w-3" /> Firmada por Juez</Badge>}
-                          {w.status === 'rechazada' && <Badge className="bg-red-100 text-red-800 hover:bg-red-100 flex gap-1"><XCircle className="h-3 w-3" /> Rechazada</Badge>}
+                          {w.status === 'pendiente' && <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pendiente</Badge>}
+                          {w.status === 'aprobada' && <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Firmada</Badge>}
+                          {w.status === 'rechazada' && <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rechazada</Badge>}
                         </div>
                         <h4 className="font-bold text-slate-800">Objetivo: {w.target}</h4>
                         <p className="text-sm text-slate-500 mt-1 line-clamp-1">{w.reason}</p>
-                        {w.rejectionReason && <p className="text-xs text-red-600 mt-1 font-bold">Motivo rechazo: {w.rejectionReason}</p>}
-                        <div className="text-xs text-slate-400 mt-2">Solicitado por: {w.requestedBy} • {new Date(w.createdAt).toLocaleDateString()}</div>
+                        {w.rejectionReason && <p className="text-xs text-red-600 mt-1 font-bold">Rechazo: {w.rejectionReason}</p>}
                       </div>
 
-                      {/* ACCIONES DEL JUEZ */}
                       {isJudge && w.status === 'pendiente' && (
                         <div className="flex gap-2">
                           <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => signWarrant.mutate(w.id)}>
@@ -298,7 +291,10 @@ export default function CauseDetailPage() {
                               <Button size="sm" variant="destructive" onClick={() => setSelectedWarrantId(w.id)}>Rechazar</Button>
                             </DialogTrigger>
                             <DialogContent>
-                              <DialogHeader><DialogTitle>Rechazar Solicitud</DialogTitle></DialogHeader>
+                              <DialogHeader>
+                                <DialogTitle>Rechazar Solicitud</DialogTitle>
+                                <DialogDescription>Indique el motivo por el cual rechaza esta solicitud.</DialogDescription>
+                              </DialogHeader>
                               <div className="py-4">
                                 <Label>Motivo del rechazo</Label>
                                 <Input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Falta de pruebas..." />
@@ -317,21 +313,19 @@ export default function CauseDetailPage() {
             </div>
           </TabsContent>
 
-          {/* TAB: EVIDENCIA (Placeholder) */}
           <TabsContent value="evidencia" className="mt-6">
             <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
               <FileSearch className="h-10 w-10 mx-auto text-slate-300 mb-3" />
               <h3 className="text-slate-500 font-medium">Gestión de Evidencia</h3>
-              <p className="text-sm text-slate-400">Próximamente: Subida de imágenes y documentos.</p>
+              <p className="text-sm text-slate-400">Próximamente.</p>
             </div>
           </TabsContent>
 
-          {/* TAB: HISTORIAL (Placeholder) */}
           <TabsContent value="historial" className="mt-6">
             <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
               <ShieldAlert className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-              <h3 className="text-slate-500 font-medium">Bitácora de Actuaciones</h3>
-              <p className="text-sm text-slate-400">Próximamente: Historial inmutable de movimientos.</p>
+              <h3 className="text-slate-500 font-medium">Bitácora</h3>
+              <p className="text-sm text-slate-400">Próximamente.</p>
             </div>
           </TabsContent>
         </Tabs>
