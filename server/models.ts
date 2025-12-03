@@ -51,7 +51,7 @@ const licenciaSchema = new mongoose.Schema({
 const cedulaSchema = new mongoose.Schema({
     // Datos de Identidad
     discordId: { type: String, required: true, unique: true },
-    username: { type: String }, // Mapeado de discordName
+    username: { type: String }, 
     avatar: { type: String },
     robloxId: { type: String, unique: true, sparse: true },
     rut: { type: String, unique: true, sparse: true },
@@ -61,7 +61,7 @@ const cedulaSchema = new mongoose.Schema({
     
     // Datos Profesionales y Rol
     profesion: { type: String, default: 'Civil' },
-    roles: { type: [String], default: [] }, // Roles del servidor
+    roles: { type: [String], default: [] },
     
     // Economía y Bienes
     cuentas: [cuentaSchema],
@@ -72,7 +72,7 @@ const cedulaSchema = new mongoose.Schema({
     multas: [multaSchema],
     
     // Meta
-    ordenDetencion: { type: Boolean, default: false } // Campo útil para el panel judicial
+    ordenDetencion: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // ===================================================================
@@ -88,7 +88,7 @@ const historialEstadoSchema = new mongoose.Schema({
 
 const vehiculoSchema = new mongoose.Schema({
     placa: { type: String, unique: true, uppercase: true, required: true },
-    rut: { type: String, required: true }, // Dueño
+    rut: { type: String, required: true },
     marca: { type: String, required: true },
     modelo: { type: String, required: true },
     color: { type: String, default: '#ffffff' },
@@ -101,26 +101,26 @@ const vehiculoSchema = new mongoose.Schema({
     },
     
     historialDeEstado: [historialEstadoSchema],
-    encargoRobo: { type: Boolean, default: false }, // Para la policía
+    encargoRobo: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // ===================================================================
-// 3. MODELOS PROPIOS DEL SISTEMA JUDICIAL (Causas, Órdenes, Usuarios Internos)
+// 3. MODELOS PROPIOS DEL SISTEMA JUDICIAL
 // ===================================================================
 
 const userSchema = new mongoose.Schema({
     discordId: { type: String, required: true, unique: true },
     username: { type: String, required: true },
     avatar: { type: String },
-    role: { type: String, default: "civil" }, // admin, juez, fiscal...
+    role: { type: String, default: "civil" },
 });
 
-// CAUSAS (Expedientes)
+// CAUSAS
 const causeSchema = new mongoose.Schema({
     ruc: { type: String, required: true },
     rit: { type: String },
     descripcion: { type: String, required: true },
-    estado: { type: String, default: "investigacion" }, // investigacion, judicializada, cerrada
+    estado: { type: String, default: "investigacion" },
     imputadoRut: { type: String, required: true },
     fiscalId: { type: String },
     juezId: { type: String },
@@ -133,23 +133,45 @@ const causeSchema = new mongoose.Schema({
     }],
 }, { timestamps: true });
 
-// ÓRDENES JUDICIALES (Warrants)
+// ÓRDENES JUDICIALES
 const warrantSchema = new mongoose.Schema({
     causeId: { type: String, required: true },
-    type: { type: String, required: true }, // detencion, allanamiento, secreto_bancario
+    type: { type: String, required: true },
     target: { type: String, required: true },
     reason: { type: String, required: true },
-    status: { type: String, default: "pendiente" }, // pendiente, aprobada, rechazada
-    requestedBy: { type: String, required: true }, // Fiscal
-    signedBy: { type: String }, // Juez
+    status: { type: String, default: "pendiente" },
+    requestedBy: { type: String, required: true },
+    signedBy: { type: String },
     rejectionReason: { type: String },
     signedAt: { type: Date },
 }, { timestamps: true });
 
-// Exportamos usando nombres estándar para que `storage.ts` no se rompa
+// INCAUTACIONES (Recuperado)
+const confiscationSchema = new mongoose.Schema({
+  causeId: { type: String, required: true },
+  descripcion: { type: String, required: true },
+  items: { type: String, required: true },
+  ubicacion: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// CITACIONES (Recuperado)
+const citationSchema = new mongoose.Schema({
+  causeId: { type: String, required: true },
+  citadoRut: { type: String, required: true },
+  fecha: { type: String, required: true },
+  hora: { type: String, required: true },
+  lugar: { type: String, required: true },
+  motivo: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// EXPORTS
 export const UserModel = mongoose.models.User || mongoose.model("User", userSchema);
-// Mapeamos 'Cedula' a 'CitizenModel' para que el código existente funcione
 export const CitizenModel = mongoose.models.Cedula || mongoose.model("Cedula", cedulaSchema);
 export const VehicleModel = mongoose.models.Vehiculo || mongoose.model("Vehiculo", vehiculoSchema);
 export const CauseModel = mongoose.models.Cause || mongoose.model("Cause", causeSchema);
 export const WarrantModel = mongoose.models.Warrant || mongoose.model("Warrant", warrantSchema);
+// Añadidos los faltantes:
+export const ConfiscationModel = mongoose.models.Confiscation || mongoose.model("Confiscation", confiscationSchema);
+export const CitationModel = mongoose.models.Citation || mongoose.model("Citation", citationSchema);
